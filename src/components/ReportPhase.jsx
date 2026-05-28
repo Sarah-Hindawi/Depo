@@ -85,7 +85,7 @@ export function ReportPhase({ state, onRestart }) {
             <div className={styles.qaA}>{h.a}</div>
             {sc && (
               <div className={`${styles.feedbackCard} ${styles['feedback_' + sc.overall]}`} style={{ marginTop: '0.4rem' }}>
-                {sc.tip}
+                {sc.inline_feedback || sc.tip}
               </div>
             )}
           </div>

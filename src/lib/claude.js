@@ -1,8 +1,6 @@
-// ─── Anthropic API ────────────────────────────────────────────────────────────
-// All Claude calls go through this module.
-// Add VITE_ANTHROPIC_API_KEY to your .env file.
+// ─── LLM API (Groq) ───────────────────────────────────────────────────────────
+// All model calls go through this module.
 // WARNING: Never expose API keys in a production/public build.
-// For production, proxy all calls through your own backend.
 
 const API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.3-70b-versatile'
@@ -50,39 +48,52 @@ Witness role: ${witnessRole}
 Jurisdiction: Ontario, Canada (assume unless stated otherwise)`
 }
 
+const TACTIC_INSTRUCTIONS = {
+  open_ended:      'Ask an open-ended question to gather information. Use "Tell me about…" or "Can you describe…"',
+  leading_soft:    'Ask a mildly leading question that gently steers the witness toward confirming a fact.',
+  leading_lockin:  'Lock the witness into a specific concession they\'ve already implied. E.g., "So you\'re saying…" or "Let me make sure I understand — you [fact]?"',
+  compound:        'Embed two or more sub-questions in a single question so the witness must answer all parts.',
+  false_premise:   'Embed a false or unproven premise. E.g., "After you did X…" (where X may not have happened).',
+  speculation_bait:'Invite the witness to speculate. E.g., "What do you think he was planning?" or "Why do you suppose…?"',
+  emotional_prov:  'Use emotionally challenging framing to test composure. Stay professional but pointed.',
+  impeachment:     'Point to a weakness or inconsistency in what the witness has said and press on it.',
+  prior_quote:     'Quote or paraphrase something the witness said earlier in this deposition and probe its consistency.',
+}
+
 function buildSimSystem(caseType, witnessRole) {
-  return `You are playing the role of opposing counsel conducting a deposition examination.
+  return `You are playing the role of opposing counsel conducting a civil deposition examination.
 
 Your style:
 - Professional, methodical, and sometimes challenging — but never abusive
-- Ask one focused question at a time
-- Base your questions on the case documents provided
-- Probe for weaknesses, lock in testimony, test consistency
-
-Question structure (follow this order):
-1. Background (role, timeline, relationships)
-2. Establish undisputed facts
-3. Probe the core facts and claims
-4. Challenge weak points or inconsistencies
+- Ask exactly ONE question per turn (never multiple)
+- Ground every question in the case documents provided
+- Follow the tactic instruction precisely
 
 Case type: ${caseType}
-Witness role: ${witnessRole}`
+Witness role: ${witnessRole}
+Jurisdiction: Ontario, Canada`
 }
 
-const EVAL_SYSTEM = `You are a deposition coach evaluating a witness's answer.
+const EVAL_SYSTEM = `You are a deposition prep coach evaluating a witness's answer against a 10-rule rubric.
 
 Rules:
-- Respond in plain language — no legal jargon
-- Be direct but kind — the client needs honest feedback to improve
-- Focus on what they can immediately change
+- Plain language only — no legal jargon
+- Be direct but kind
+- Use prior Q&A history to judge consistency
 
 Return ONLY valid JSON, no markdown, no preamble:
 {
-  "relevance": "On Point" | "Off Track" | "Over-Explained",
-  "tone": "Confident" | "Neutral" | "Defensive" | "Evasive",
-  "volunteered": boolean,
-  "tip": "one coaching sentence, max 20 words, plain language",
-  "overall": "good" | "warn" | "bad"
+  "only_answered_what_asked": boolean,
+  "volunteered_info": boolean,
+  "speculated": boolean,
+  "argued_with_attorney": boolean,
+  "emotional": boolean,
+  "consistent_with_prior": boolean,
+  "walked_into_compound": boolean,
+  "accepted_false_premise": boolean,
+  "overall_severity": "low" | "medium" | "high",
+  "inline_feedback": "one plain-language coaching sentence, max 25 words",
+  "coaching_note": "1-2 sentences of specific improvement advice"
 }`
 
 const REPORT_SYSTEM = `You are a deposition coach writing a post-session report for a client.
@@ -163,60 +174,69 @@ Base everything on the actual documents. Be specific — not generic advice.`,
 }
 
 /**
- * Generate deposition questions grounded in uploaded documents.
- * Returns array of 6 question strings.
+ * Generate ONE deposition question using a specific attorney tactic.
+ * Called once per turn; tactic + phase are selected by the state machine.
  */
-export async function generateDepoQuestions(fileTexts, fileNames, summary, caseType, witnessRole) {
-  const combined = fileTexts
-    .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
-    .join('\n\n')
+export async function generateNextQuestion(tactic, sessionPhase, history, summary, caseType, witnessRole, concededFacts) {
+  const combined = history.length
+    ? history.slice(-4).map((h, i) => `Q: ${h.q}\nA: ${h.a}`).join('\n\n')
+    : 'No prior questions yet — this is the opening question.'
+
+  const concededCtx = concededFacts.length
+    ? `Facts the witness has already conceded or volunteered:\n${concededFacts.join('\n')}`
+    : ''
+
+  const tacticNote = TACTIC_INSTRUCTIONS[tactic] || 'Ask a clear, professional question.'
 
   const raw = await callModel(
     [
       {
         role: 'user',
-        content: `Generate exactly 6 deposition questions opposing counsel would ask this witness.
+        content: `Generate exactly ONE deposition question.
 
-Case type: ${caseType}
-Witness role: ${witnessRole}
+Tactic to use: ${tactic}
+Tactic instruction: ${tacticNote}
+Current deposition phase: ${sessionPhase}
 Case summary: ${summary}
-Documents:
+${concededCtx}
+
+Recent Q&A history:
 ${combined}
 
-Question structure:
-- Q1-2: Background (role, timeline, key relationships)
-- Q3-4: Core facts and claims in the documents
-- Q5-6: Challenging questions targeting weak points or inconsistencies
-
 Return ONLY valid JSON, no markdown:
-{"questions": ["q1", "q2", "q3", "q4", "q5", "q6"]}
+{"question": "the single question text"}
 
-Make questions specific to the documents — not generic deposition questions.`,
+The question must be grounded in the case. Do not add any preamble.`,
       },
     ],
     buildSimSystem(caseType, witnessRole)
   )
 
   const clean = raw.replace(/```json|```/g, '').trim()
-  return JSON.parse(clean).questions
+  return JSON.parse(clean).question
 }
 
 /**
- * Evaluate a single deposition answer.
- * Returns { relevance, tone, volunteered, tip, overall }
+ * Evaluate a single deposition answer against the 10-rule rubric.
+ * history is used for consistency checking.
  */
-export async function evaluateAnswer(question, answer, summary, elapsedSeconds, wordCount) {
+export async function evaluateAnswer(question, answer, summary, elapsedSeconds, wordCount, history = []) {
+  const priorContext = history.length
+    ? 'Prior answers for consistency check:\n' + history.slice(-3).map((h, i) => `A${i + 1}: ${h.a}`).join('\n')
+    : ''
+
   const raw = await callModel(
     [
       {
         role: 'user',
-        content: `Evaluate this deposition answer.
+        content: `Evaluate this deposition answer against the 10-rule witness rubric.
 
 Question: "${question}"
 Answer: "${answer}"
 Case context: ${summary}
 Response time: ${Math.round(elapsedSeconds)} seconds
-Word count: ${wordCount} words`,
+Word count: ${wordCount} words
+${priorContext}`,
       },
     ],
     EVAL_SYSTEM
@@ -234,7 +254,7 @@ export async function generateReport(history, scorecards, avgScore, fillerTotal,
   const qaLog = history
     .map(
       (h, i) =>
-        `Q${i + 1}: ${h.q}\nAnswer: ${h.a}\nCoach note: ${scorecards[i]?.tip || ''}\nOverall: ${scorecards[i]?.overall || ''}`
+        `Q${i + 1}: ${h.q}\nAnswer: ${h.a}\nCoach note: ${scorecards[i]?.inline_feedback || scorecards[i]?.tip || ''}\nSeverity: ${scorecards[i]?.overall_severity || scorecards[i]?.overall || ''}`
     )
     .join('\n\n')
 

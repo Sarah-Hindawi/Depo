@@ -20,9 +20,9 @@ export function classifyPace(seconds, wordCount) {
 }
 
 // ─── Session score ────────────────────────────────────────────────────────────
-export function scoreAnswer(overall) {
-  if (overall === 'good')  return 85
-  if (overall === 'warn')  return 60
+export function scoreAnswer(severity) {
+  if (severity === 'low')    return 85
+  if (severity === 'medium') return 60
   return 35
 }
 
@@ -94,7 +94,7 @@ export function downloadReport(history, scorecards, report, score, caseType) {
       '',
       `Q${i + 1}: ${h.q}`,
       `Your answer: ${h.a}`,
-      `Coach feedback: ${scorecards[i]?.tip || '—'}`,
+      `Coach feedback: ${scorecards[i]?.inline_feedback || scorecards[i]?.tip || '—'}`,
       `Rating: ${scorecards[i]?.overall || '—'}`,
     ]),
   ]

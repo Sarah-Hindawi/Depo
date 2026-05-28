@@ -2,9 +2,15 @@ import React, { useRef, useEffect } from 'react'
 import { Badge, ErrorMsg } from './ui.jsx'
 import { useVoice } from '../hooks/useVoice.js'
 import { computeAvgScore } from '../lib/utils.js'
+import { TOTAL_TURNS } from '../hooks/useDepoSession.js'
 import styles from './phases.module.css'
 
-const TOTAL_Q = 6
+const PHASE_LABELS = {
+  BACKGROUND:  'Background',
+  FOUNDATION:  'Foundation',
+  CORE:        'Core examination',
+  CROSS_TRAP:  'Cross-examination',
+}
 
 const QUICK_RULES = [
   'Answer only what was asked',
@@ -19,15 +25,16 @@ export function SimPhase({ state, set, patch, onSubmit }) {
   const answerStartRef = useRef(null)
   const textareaRef = useRef(null)
 
-  const q = state.questions[state.currentQ]
+  const q = state.currentQuestion?.text
   const avgScore = computeAvgScore(state.scores)
-  const progPct = Math.round((state.currentQ / TOTAL_Q) * 100)
+  const progPct = Math.round((state.currentTurnIdx / TOTAL_TURNS) * 100)
+  const phaseLabel = PHASE_LABELS[state.sessionPhase] || state.sessionPhase
 
   useEffect(() => {
     answerStartRef.current = null
     set('answer', '')
     textareaRef.current?.focus()
-  }, [state.currentQ])
+  }, [state.currentTurnIdx])
 
   function handleFocus() {
     if (!answerStartRef.current) answerStartRef.current = Date.now()
@@ -51,7 +58,7 @@ export function SimPhase({ state, set, patch, onSubmit }) {
   }
 
   const sc = state.lastFeedback
-  const showFeedback = sc && state.history.length === state.currentQ
+  const showFeedback = sc && state.history.length > 0 && state.history.length === state.currentTurnIdx
 
   return (
     <div className={styles.simLayout}>
@@ -67,8 +74,12 @@ export function SimPhase({ state, set, patch, onSubmit }) {
               {hsc && (
                 <div className={styles.badgeRow}>
                   <Badge variant={hsc.pace === 'good' ? 'good' : 'warn'}>{hsc.paceLabel}</Badge>
-                  <Badge variant={hsc.tone === 'Confident' || hsc.tone === 'Neutral' ? 'good' : 'warn'}>{hsc.tone}</Badge>
-                  {hsc.volunteered && <Badge variant="bad">Over-shared</Badge>}
+                  {hsc.volunteered_info && <Badge variant="bad">Over-shared</Badge>}
+                  {hsc.speculated && <Badge variant="bad">Speculated</Badge>}
+                  {hsc.emotional && <Badge variant="warn">Emotional</Badge>}
+                  {hsc.consistent_with_prior === false && <Badge variant="bad">Inconsistent</Badge>}
+                  {hsc.walked_into_compound && <Badge variant="warn">Compound trap</Badge>}
+                  {hsc.accepted_false_premise && <Badge variant="bad">False premise</Badge>}
                 </div>
               )}
             </div>
@@ -79,9 +90,9 @@ export function SimPhase({ state, set, patch, onSubmit }) {
         <div className={styles.qCard}>
           <div className={styles.qMeta}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M3 6l9-4 9 4v6c0 5.25-3.75 9.75-9 11-5.25-1.25-9-5.75-9-11V6z"/></svg>
-            Opposing counsel · Question {state.currentQ + 1} of {TOTAL_Q}
+            Opposing counsel · {phaseLabel} · Question {state.currentTurnIdx + 1} of {TOTAL_TURNS}
           </div>
-          <div className={styles.qText}>"{q}"</div>
+          <div className={styles.qText}>{q ? `"${q}"` : '...'}</div>
 
           <div className={styles.answerLabel}>Your answer — speak or type</div>
           <div className={styles.ansRow}>
@@ -117,7 +128,7 @@ export function SimPhase({ state, set, patch, onSubmit }) {
           >
             {state.loading
               ? 'Evaluating...'
-              : state.currentQ + 1 >= TOTAL_Q
+              : state.currentTurnIdx + 1 >= TOTAL_TURNS
               ? 'Submit final answer →'
               : 'Submit answer →'}
           </button>
@@ -129,13 +140,20 @@ export function SimPhase({ state, set, patch, onSubmit }) {
             <div className={styles.feedbackTitle}>
               {sc.overall === 'good' ? 'Good answer' : sc.overall === 'warn' ? 'Something to work on' : 'Important to fix'}
             </div>
-            <div className={styles.feedbackTip}>{sc.tip}</div>
+            <div className={styles.feedbackTip}>{sc.inline_feedback}</div>
+            {sc.coaching_note && sc.coaching_note !== sc.inline_feedback && (
+              <div className={styles.feedbackTip} style={{ opacity: 0.75, marginTop: '0.3rem' }}>{sc.coaching_note}</div>
+            )}
             <div className={styles.badgeRow} style={{ marginTop: '0.6rem' }}>
               <Badge variant={sc.pace === 'good' ? 'good' : 'warn'}>{sc.paceLabel}</Badge>
-              <Badge variant={sc.tone === 'Confident' || sc.tone === 'Neutral' ? 'good' : 'warn'}>{sc.tone}</Badge>
-              <Badge variant={sc.relevance === 'On Point' ? 'good' : 'warn'}>{sc.relevance}</Badge>
-              {sc.fillers.length > 0 && <Badge variant="warn">Filler words: {sc.fillers.join(', ')}</Badge>}
-              {sc.volunteered && <Badge variant="bad">Over-shared info</Badge>}
+              {sc.fillers.length > 0 && <Badge variant="warn">Fillers: {sc.fillers.join(', ')}</Badge>}
+              {sc.volunteered_info && <Badge variant="bad">Over-shared info</Badge>}
+              {sc.speculated && <Badge variant="bad">Speculated</Badge>}
+              {sc.emotional && <Badge variant="warn">Emotional</Badge>}
+              {sc.argued_with_attorney && <Badge variant="warn">Argued</Badge>}
+              {sc.consistent_with_prior === false && <Badge variant="bad">Inconsistent</Badge>}
+              {sc.walked_into_compound && <Badge variant="warn">Compound trap</Badge>}
+              {sc.accepted_false_premise && <Badge variant="bad">False premise accepted</Badge>}
             </div>
           </div>
         )}
@@ -148,13 +166,14 @@ export function SimPhase({ state, set, patch, onSubmit }) {
           <div className={styles.progBar}>
             <div className={styles.progFill} style={{ width: progPct + '%' }} />
           </div>
-          <div className={styles.progLabel}>{state.currentQ} of {TOTAL_Q} answered</div>
+          <div className={styles.progLabel}>{state.currentTurnIdx} of {TOTAL_TURNS} answered</div>
+          <div className={styles.progLabel} style={{ marginTop: '0.25rem', opacity: 0.6 }}>Phase: {phaseLabel}</div>
           {state.scores.length > 0 && (
             <div style={{ marginTop: '0.75rem' }}>
               {[
-                ['Score',          avgScore + '/100'],
-                ['Filler words',   state.fillerTotal],
-                ['Over-shared',    state.volTotal + '×'],
+                ['Score',         avgScore + '/100'],
+                ['Filler words',  state.fillerTotal],
+                ['Over-shared',   state.volTotal + '×'],
               ].map(([l, v]) => (
                 <div key={l} className={styles.statRow}>
                   <span>{l}</span><span className={styles.statVal}>{v}</span>
