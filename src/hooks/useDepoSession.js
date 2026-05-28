@@ -48,8 +48,13 @@ function weightedRandom(weights) {
   return Object.keys(weights)[0]
 }
 
-// Promotion rules (§6.5): force specific tactic based on last score
-function selectTactic(sessionPhase, tacticHistory, lastScore) {
+// Promotion rules (§6.5): force specific tactic based on last score.
+// FOUNDATION special case: if no concessions yet, force leading_lockin to get one.
+function selectTactic(sessionPhase, tacticHistory, lastScore, concededFacts = []) {
+  // FOUNDATION gate: if no concessions yet, force leading_lockin
+  if (sessionPhase === 'FOUNDATION' && concededFacts.length === 0) {
+    return 'leading_lockin'
+  }
   if (lastScore) {
     if (lastScore.consistent_with_prior === false) return 'prior_quote'
     if (lastScore.volunteered_info === true)       return 'leading_lockin'
@@ -65,7 +70,7 @@ function selectTactic(sessionPhase, tacticHistory, lastScore) {
   return weightedRandom(weights)
 }
 
-// Map turn index → session phase
+// Map turn index → default session phase by quota
 function phaseForTurn(turnIdx) {
   let cum = 0
   for (const phase of SESSION_PHASES) {
@@ -73,6 +78,24 @@ function phaseForTurn(turnIdx) {
     if (turnIdx < cum) return phase
   }
   return 'CROSS_TRAP'
+}
+
+// State-diagram transition rules (override default phase-by-turn):
+// FOUNDATION exits only when phase_complete AND conceded_facts >= 1
+// CORE exits on phase_complete OR inconsistency_detected (early jump)
+// CROSS_TRAP exits on phase_complete OR user_recanted
+function nextPhase(currentPhase, defaultNextPhase, concededFacts, lastScore, crossTrapConsecutiveClean) {
+  if (currentPhase === 'FOUNDATION' && defaultNextPhase === 'CORE' && concededFacts.length < 1) {
+    return 'FOUNDATION' // stay until at least 1 concession
+  }
+  if (currentPhase === 'CORE' && lastScore?.consistent_with_prior === false) {
+    return 'CROSS_TRAP' // early jump on inconsistency_detected
+  }
+  // user_recanted: witness was clean for 2 consecutive CROSS_TRAP turns → exit early
+  if (currentPhase === 'CROSS_TRAP' && crossTrapConsecutiveClean >= 2) {
+    return 'DEBRIEF'
+  }
+  return defaultNextPhase
 }
 
 // Fallback questions when LLM fails
@@ -112,6 +135,7 @@ const INITIAL = {
   scorecards: [],            // one per turn
   concededFacts: [],         // append-only (Layer 1 state)
   tacticHistory: [],         // tactic used each turn (Layer 2 state)
+  crossTrapClean: 0,         // consecutive clean turns in CROSS_TRAP (user_recanted detection)
   lastFeedback: null,
   flags: [],
   scores: [],
@@ -228,7 +252,7 @@ export function useDepoSession() {
       currentTurnIdx: 0,
       sessionPhase: 'BACKGROUND',
       history: [], scorecards: [], concededFacts: [],
-      tacticHistory: [tactic],
+      tacticHistory: [tactic], crossTrapClean: 0,
       lastFeedback: null, flags: [], scores: [], fillerTotal: 0, volTotal: 0,
       answer: '', answerStart: null,
       loading: false, phase: 'sim',
@@ -321,12 +345,20 @@ export function useDepoSession() {
       return
     }
 
-    // ── Layer 1 phase advance (with early-jump rule) ──────────────────────
-    const forceEarlyTrap = !ev.consistent_with_prior && state.sessionPhase === 'CORE'
-    const nextSessionPhase = forceEarlyTrap ? 'CROSS_TRAP' : phaseForTurn(nextTurnIdx)
+    // ── Layer 1 phase advance (state-diagram rules) ───────────────────────
+    // Track consecutive clean turns for user_recanted detection in CROSS_TRAP
+    const isClean = ev.consistent_with_prior && !ev.volunteered_info && !ev.speculated && !ev.emotional
+    const newCrossTrapClean = state.sessionPhase === 'CROSS_TRAP'
+      ? (isClean ? state.crossTrapClean + 1 : 0)
+      : 0
+
+    const defaultNext = phaseForTurn(nextTurnIdx)
+    const nextSessionPhase = nextPhase(
+      state.sessionPhase, defaultNext, newFacts, ev, newCrossTrapClean
+    )
 
     // ── Layer 2 tactic selection ──────────────────────────────────────────
-    const nextTactic = selectTactic(nextSessionPhase, currentTacticH, ev)
+    const nextTactic = selectTactic(nextSessionPhase, currentTacticH, ev, newFacts)
     const newTacticHistory = [...currentTacticH, nextTactic]
 
     // ── Generate next question ────────────────────────────────────────────
@@ -344,6 +376,7 @@ export function useDepoSession() {
       history: newHistory, scorecards: newScorecards, scores: newScores,
       fillerTotal: newFillers, volTotal: newVol, flags: newFlags,
       concededFacts: newFacts, tacticHistory: newTacticHistory,
+      crossTrapClean: newCrossTrapClean,
       currentTurnIdx: nextTurnIdx,
       sessionPhase: nextSessionPhase,
       currentQuestion: { text: nextQuestionText, tactic: nextTactic, sessionPhase: nextSessionPhase },
