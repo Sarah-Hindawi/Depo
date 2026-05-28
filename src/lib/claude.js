@@ -56,8 +56,8 @@ export async function analyzeCaseDocuments(fileTexts, fileNames, caseType, witne
     [{ role: 'user', content: caseSummaryPrompt(combined) }],
     caseSummarySystem(caseType, witnessRole)
   )
-  // Strip any === filename === headers the model echoed back
-  return raw.replace(/===\s*.+?\s*===\n?/g, '').trim()
+  // Strip any === filename === header lines the model echoed back
+  return raw.replace(/^===.+===\n?/gm, '').trim()
 }
 
 export async function generatePrepGuide(fileTexts, fileNames, summary, caseType, witnessRole) {
