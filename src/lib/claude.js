@@ -48,10 +48,24 @@ function getAttorneyPrompts(sessionPhase) {
 
 // ─── Intake functions ─────────────────────────────────────────────────────────
 
-export async function analyzeCaseDocuments(fileTexts, fileNames, caseType, witnessRole) {
-  const combined = fileTexts
-    .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
+// Strip binary garbage and non-printable characters from file text.
+// FileReader.readAsText() on a PDF/DOCX produces raw binary bytes — clean them
+// before sending to the model so they don't appear in the output.
+function cleanText(raw) {
+  return raw
+    .replace(/[^\x09\x0A\x0D\x20-\x7E -￿]/g, ' ') // non-printable → space
+    .replace(/ {3,}/g, ' ')                                    // collapse runs of spaces
+    .trim()
+}
+
+function buildCombined(fileTexts, fileNames) {
+  return fileTexts
+    .map((t, i) => `=== ${fileNames[i]} ===\n${cleanText(t).slice(0, 3000)}`)
     .join('\n\n')
+}
+
+export async function analyzeCaseDocuments(fileTexts, fileNames, caseType, witnessRole) {
+  const combined = buildCombined(fileTexts, fileNames)
   const raw = await callModel(
     [{ role: 'user', content: caseSummaryPrompt(combined) }],
     caseSummarySystem(caseType, witnessRole)
@@ -61,9 +75,7 @@ export async function analyzeCaseDocuments(fileTexts, fileNames, caseType, witne
 }
 
 export async function generatePrepGuide(fileTexts, fileNames, summary, caseType, witnessRole) {
-  const combined = fileTexts
-    .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
-    .join('\n\n')
+  const combined = buildCombined(fileTexts, fileNames)
   const raw = await callModel(
     [{ role: 'user', content: prepGuidePrompt(combined, summary) }],
     caseSummarySystem(caseType, witnessRole)
