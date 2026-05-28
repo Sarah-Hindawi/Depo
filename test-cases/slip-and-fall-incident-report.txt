@@ -1,0 +1,105 @@
+INCIDENT REPORT — SHOP A
+============================================
+
+CASE TYPE: Personal injury / occupier's liability
+PARTIES:
+  Plaintiff: [Client name], suing in their personal capacity
+  Defendant: Shop A (Ontario business operating retail premises with adjoining parking lot)
+  Jurisdiction: Ontario, Canada — Occupiers' Liability Act
+
+INCIDENT DATE: [Date of incident]
+INCIDENT TIME: Approximately [time]
+INCIDENT LOCATION: Parking lot of Shop A premises, [street address], [city], Ontario
+
+----------------------------------------------------
+FACTUAL BACKGROUND
+----------------------------------------------------
+
+On [date], the Plaintiff was crossing the parking lot adjoining Shop A's retail
+premises when they slipped on accumulated ice and fell. The Plaintiff sustained
+a fracture to the [left/right] leg requiring surgical fixation and an extended
+course of physiotherapy.
+
+The Plaintiff alleges that Shop A failed in its duty under the Occupiers'
+Liability Act to take reasonable steps to maintain safe premises — specifically,
+that the parking lot had not been salted, sanded, or otherwise treated for ice
+on the morning of the incident, despite freezing overnight temperatures.
+
+----------------------------------------------------
+PLAINTIFF'S CLAIMED INJURIES
+----------------------------------------------------
+
+  - Closed displaced fracture of the [tibia / fibula], operatively reduced
+  - Soft tissue injury to ipsilateral knee
+  - Post-surgical infection (resolved with antibiotics)
+  - Ongoing physiotherapy: 24+ sessions to date
+  - Reported chronic pain and reduced range of motion
+  - Time off work: [N] weeks, with reduced-duty return thereafter
+  - Income loss claim: $[amount]
+
+Treatment providers:
+  - [Hospital name] — emergency presentation, surgical fixation
+  - Dr. [Surname], orthopedic surgeon — follow-up care
+  - [Physiotherapy clinic] — rehabilitative course
+
+Pre-existing conditions:
+  - [Document any reported prior orthopedic history relevant to defence ¶10]
+
+----------------------------------------------------
+DEFENCE THEORY (anticipated)
+----------------------------------------------------
+
+  1. Contributory negligence — Plaintiff was inattentive at the time of the
+     fall (distraction by phone, music, or conversation).
+
+  2. Footwear — Plaintiff was not wearing appropriate winter footwear for the
+     weather conditions on the date in question.
+
+  3. Awareness of risk — Plaintiff was familiar with the parking lot, had
+     visited the premises on prior occasions, and knew or ought to have known
+     that ice would have formed overnight.
+
+  4. Maintenance — Shop A had a contractor on rotation; the Plaintiff cannot
+     prove the lot was untreated for an unreasonable duration.
+
+  5. Damages — Plaintiff's reported chronic pain is consistent with a pre-
+     existing condition pre-dating the incident.
+
+----------------------------------------------------
+NOTES FOR DEPOSITION PREPARATION
+----------------------------------------------------
+
+The Plaintiff will be deposed in this matter. Expected lines of questioning by
+opposing counsel:
+
+BACKGROUND / IDENTITY:
+  - Full legal name, current address, date of birth, marital status
+  - Any prior names (maiden name, nicknames on government records)
+  - Prior testimony in any matter
+
+FACT-GATHERING:
+  - Date and exact time of incident
+  - Exact location: specific entrance, specific parking spot, route across lot
+  - Medical history relevant to defence ¶3 and ¶5
+  - Diagnoses received, treatments undertaken, medications prescribed
+  - Pre-incident orthopedic history
+
+CORE / CONTRIBUTORY NEGLIGENCE PROBES:
+  - Activity at the moment of the fall — where was the Plaintiff looking?
+  - Distractions: phone use, music, conversation
+  - Footwear worn that morning
+  - Number of prior visits to the premises in the year leading up to the fall
+  - Loss of income — exact figures, return-to-work date, reduced duties
+
+VEXATIOUS / TRAP-STYLE QUESTIONS THE PLAINTIFF SHOULD BE COACHED ON:
+  - "Are you sure you weren't being careless at the time?"
+  - "Would you say you weren't being fully careful when crossing?"
+  - "You were on your way to meet someone — that's why you weren't paying
+     attention, isn't it?"
+  - "You knew the lot got icy in winter — you'd been here before — so really
+     this is on you, isn't it?"
+
+Specificity coaching: where the Plaintiff gives broad answers ("Bloor Street"),
+opposing counsel will press for exact intersection, building entrance, parking
+row, etc. Encourage precise factual answers and "I don't recall" where genuinely
+uncertain — do NOT guess.

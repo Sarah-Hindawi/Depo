@@ -18,8 +18,8 @@ import {
 // ─── Layer 1: Session phase machine ──────────────────────────────────────────
 // BACKGROUND → FOUNDATION → CORE → CROSS_TRAP (monotonic; CORE can early-jump)
 const SESSION_PHASES = ['BACKGROUND', 'FOUNDATION', 'CORE', 'CROSS_TRAP']
-const PHASE_TURNS    = { BACKGROUND: 2, FOUNDATION: 2, CORE: 3, CROSS_TRAP: 2 }
-export const TOTAL_TURNS = Object.values(PHASE_TURNS).reduce((a, b) => a + b, 0) // 9
+const PHASE_TURNS    = { BACKGROUND: 1, FOUNDATION: 1, CORE: 1, CROSS_TRAP: 1 }
+export const TOTAL_TURNS = Object.values(PHASE_TURNS).reduce((a, b) => a + b, 0) // 4
 
 // ─── Layer 2: Attorney tactic machine ────────────────────────────────────────
 // Weights come from DepoSim design doc §6.4
@@ -81,17 +81,15 @@ function phaseForTurn(turnIdx) {
 }
 
 // State-diagram transition rules (override default phase-by-turn):
-// FOUNDATION exits only when phase_complete AND conceded_facts >= 1
-// CORE exits on phase_complete OR inconsistency_detected (early jump)
-// CROSS_TRAP exits on phase_complete OR user_recanted
+// With 1 turn per phase, the FOUNDATION conceded_facts gate is disabled —
+// each phase always advances after its single question. We keep the CORE early-
+// jump on inconsistency_detected because it can still fire on the one CORE turn.
 function nextPhase(currentPhase, defaultNextPhase, concededFacts, lastScore, crossTrapConsecutiveClean) {
-  if (currentPhase === 'FOUNDATION' && defaultNextPhase === 'CORE' && concededFacts.length < 1) {
-    return 'FOUNDATION' // stay until at least 1 concession
-  }
   if (currentPhase === 'CORE' && lastScore?.consistent_with_prior === false) {
     return 'CROSS_TRAP' // early jump on inconsistency_detected
   }
   // user_recanted: witness was clean for 2 consecutive CROSS_TRAP turns → exit early
+  // (unreachable when CROSS_TRAP only runs one turn, kept for future quota tuning)
   if (currentPhase === 'CROSS_TRAP' && crossTrapConsecutiveClean >= 2) {
     return 'DEBRIEF'
   }
