@@ -12,8 +12,8 @@ import { caseSummarySystem, caseSummaryPrompt }     from '../prompts/intake/case
 import { prepGuidePrompt }                          from '../prompts/intake/prepGuide.js'
 import { REPORT_SYSTEM, reportPrompt }              from '../prompts/intake/report.js'
 
-const API_URL   = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL     = 'llama-3.3-70b-versatile'
+const API_URL    = 'https://api.groq.com/openai/v1/chat/completions'
+const MODEL      = 'llama-3.3-70b-versatile'
 const MAX_TOKENS = 1500
 
 // ─── Base caller ─────────────────────────────────────────────────────────────
@@ -48,19 +48,9 @@ function getAttorneyPrompts(sessionPhase) {
 
 // ─── Intake functions ─────────────────────────────────────────────────────────
 
-// Strip binary garbage and non-printable characters from file text.
-// FileReader.readAsText() on a PDF/DOCX produces raw binary bytes — clean them
-// before sending to the model so they don't appear in the output.
-function cleanText(raw) {
-  return raw
-    .replace(/[^\x09\x0A\x0D\x20-\x7E -￿]/g, ' ') // non-printable → space
-    .replace(/ {3,}/g, ' ')                                    // collapse runs of spaces
-    .trim()
-}
-
 function buildCombined(fileTexts, fileNames) {
   return fileTexts
-    .map((t, i) => `=== ${fileNames[i]} ===\n${cleanText(t).slice(0, 3000)}`)
+    .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
     .join('\n\n')
 }
 
