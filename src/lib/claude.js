@@ -4,34 +4,33 @@
 // WARNING: Never expose API keys in a production/public build.
 // For production, proxy all calls through your own backend.
 
-const API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-4-20250514'
+const API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const MODEL = 'llama-3.3-70b-versatile'
 const MAX_TOKENS = 1500
 
 // ─── Base caller ─────────────────────────────────────────────────────────────
-async function callClaude(messages, systemPrompt) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+async function callModel(messages, systemPrompt) {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY
 
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(apiKey ? { 'x-api-key': apiKey } : {}),
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: systemPrompt,
-      messages,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+      ],
     }),
   })
 
   const data = await res.json()
   if (data.error) throw new Error(data.error.message)
-  return data.content
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
+  return data.choices[0].message.content
 }
 
 // ─── System prompts ───────────────────────────────────────────────────────────
@@ -112,7 +111,7 @@ export async function analyzeCaseDocuments(fileTexts, fileNames, caseType, witne
     .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
     .join('\n\n')
 
-  return callClaude(
+  return callModel(
     [
       {
         role: 'user',
@@ -136,7 +135,7 @@ export async function generatePrepGuide(fileTexts, fileNames, summary, caseType,
     .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
     .join('\n\n')
 
-  const raw = await callClaude(
+  const raw = await callModel(
     [
       {
         role: 'user',
@@ -172,7 +171,7 @@ export async function generateDepoQuestions(fileTexts, fileNames, summary, caseT
     .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
     .join('\n\n')
 
-  const raw = await callClaude(
+  const raw = await callModel(
     [
       {
         role: 'user',
@@ -207,7 +206,7 @@ Make questions specific to the documents — not generic deposition questions.`,
  * Returns { relevance, tone, volunteered, tip, overall }
  */
 export async function evaluateAnswer(question, answer, summary, elapsedSeconds, wordCount) {
-  const raw = await callClaude(
+  const raw = await callModel(
     [
       {
         role: 'user',
@@ -239,7 +238,7 @@ export async function generateReport(history, scorecards, avgScore, fillerTotal,
     )
     .join('\n\n')
 
-  const raw = await callClaude(
+  const raw = await callModel(
     [
       {
         role: 'user',
