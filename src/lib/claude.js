@@ -52,10 +52,12 @@ export async function analyzeCaseDocuments(fileTexts, fileNames, caseType, witne
   const combined = fileTexts
     .map((t, i) => `=== ${fileNames[i]} ===\n${t.slice(0, 3000)}`)
     .join('\n\n')
-  return callModel(
+  const raw = await callModel(
     [{ role: 'user', content: caseSummaryPrompt(combined) }],
     caseSummarySystem(caseType, witnessRole)
   )
+  // Strip any === filename === headers the model echoed back
+  return raw.replace(/===\s*.+?\s*===\n?/g, '').trim()
 }
 
 export async function generatePrepGuide(fileTexts, fileNames, summary, caseType, witnessRole) {

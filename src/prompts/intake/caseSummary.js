@@ -20,6 +20,7 @@ export function caseSummaryPrompt(combinedDocText) {
   return `Based on these case documents, write a plain-language summary of this case in 3-4 sentences.
 No legal jargon. Write it directly to the client as "your case".
 If information is missing or unclear, say so rather than guessing.
+Do NOT include file names, document separators, or any metadata — only the summary text itself.
 
 Documents:
 ${combinedDocText}`
